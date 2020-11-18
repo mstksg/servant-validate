@@ -83,13 +83,16 @@ type family ShowPath (path :: [Symbol]) :: Symbol where
 class HasApiTree (api :: Type) where
     type ToApiTree api :: ApiTree
 
-instance HasApiTree api => HasApiTree ((path :: Symbol) :> api) where
+instance (KnownSymbol path, HasApiTree api) => HasApiTree ((path :: Symbol) :> api) where
     type ToApiTree (path :> api) = 'Branch '[] '[ '(path, ToApiTree api) ]
 
 instance HasApiTree api => HasApiTree (Capture' mods sym a :> api) where
     type ToApiTree (Capture' mods sym a :> api) =
             'Branch '[] '[ '("<capture>", ToApiTree api) ]
 
+instance HasApiTree api => HasApiTree (CaptureAll sym v :> api) where
+    type ToApiTree (CaptureAll sym v :> api) =
+            'Branch '[] '[ '("<capture>", ToApiTree api) ]
 
 instance (HasApiTree a, HasApiTree b) => HasApiTree (a :<|> b) where
     type ToApiTree (a :<|> b) = MergeTree '[] (ToApiTree a) (ToApiTree b)
@@ -126,8 +129,35 @@ instance HasApiTree api => HasApiTree (QueryFlag s :> api) where
 instance HasApiTree api => HasApiTree (QueryParams s a :> api) where
     type ToApiTree (QueryParams s a :> api) = ToApiTree api
 
+instance HasApiTree api => HasApiTree (QueryParam' mods sym a :> api) where
+    type ToApiTree (QueryParam' mods sym a :> api) = ToApiTree api
+
 instance HasApiTree api => HasApiTree (Header' mods sym a :> api) where
     type ToApiTree (Header' mods sym a :> api) = ToApiTree api
+
+instance HasApiTree api => HasApiTree (HttpVersion :> api) where
+    type ToApiTree (HttpVersion :> api) = ToApiTree api
+
+instance HasApiTree api => HasApiTree (Vault :> api) where
+    type ToApiTree (Vault :> api) = ToApiTree api
+
+instance HasApiTree api => HasApiTree (BasicAuth realm a :> api) where
+    type ToApiTree (BasicAuth realm a :> api) = ToApiTree api
+
+instance HasApiTree api => HasApiTree (AuthProtect tag :> api) where
+    type ToApiTree (AuthProtect tag :> api) = ToApiTree api
+
+instance HasApiTree api => HasApiTree (IsSecure :> api) where
+    type ToApiTree (IsSecure :> api) = ToApiTree api
+
+instance HasApiTree api => HasApiTree (RemoteHost :> api) where
+    type ToApiTree (RemoteHost :> api) = ToApiTree api
+
+instance HasApiTree api => HasApiTree (ReqBody' mods ct a :> api) where
+    type ToApiTree (ReqBody' mods ct a :> api) = ToApiTree api
+
+instance HasApiTree api => HasApiTree (StreamBody' mods framing ct a :> api) where
+    type ToApiTree (StreamBody' mods framing ct a :> api) = ToApiTree api
 
 type ValidApiTree api = TypeRep (ToApiTree api)
 
@@ -196,7 +226,7 @@ toSSym :: TypeRep s -> SSym s
 toSSym tr = case someSymbolVal (read (show tr) :: String) of
   SomeSymbol (Proxy :: Proxy b) -> unsafeCoerce (SSym :: SSym b)
 reflectSSym :: forall s. SSym s -> Text
-reflectSSym SSym = T.pack $ symbolVal (Proxy @s)
+reflectSSym s@SSym = T.pack $ symbolVal s
 
 data SApiTree :: ApiTree -> Type where
     SBranch :: Prod SSym ms -> Prod (Tup SSym SApiTree) ts -> SApiTree ('Branch ms ts)
