@@ -1,0 +1,40 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: b7b0a8ad4a8006bd8dbea88e22b2188daa78f169c1f60d428053da23a52e98ff
+
+name:           servant-validate
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/servant-validate#readme>
+homepage:       https://github.com/githubuser/servant-validate#readme
+bug-reports:    https://github.com/githubuser/servant-validate/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2020 Author name here
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/servant-validate
+
+library
+  exposed-modules:
+      Servant.Validate
+  other-modules:
+      Paths_servant_validate
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , servant
+    , text
+  default-language: Haskell2010
