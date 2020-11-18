@@ -83,19 +83,29 @@ type family ShowPath (path :: [Symbol]) :: Symbol where
 class HasApiTree (api :: Type) where
     type ToApiTree api :: ApiTree
 
+    sApiTree :: SApiTree (ToApiTree api)
+
 instance (KnownSymbol path, HasApiTree api) => HasApiTree ((path :: Symbol) :> api) where
     type ToApiTree (path :> api) = 'Branch '[] '[ '(path, ToApiTree api) ]
+
+    sApiTree = SBranch PNil (Tup SSym (sApiTree @api) :< PNil)
 
 instance HasApiTree api => HasApiTree (Capture' mods sym a :> api) where
     type ToApiTree (Capture' mods sym a :> api) =
             'Branch '[] '[ '("<capture>", ToApiTree api) ]
 
+    sApiTree = SBranch PNil (Tup SSym (sApiTree @api) :< PNil)
+
 instance HasApiTree api => HasApiTree (CaptureAll sym v :> api) where
     type ToApiTree (CaptureAll sym v :> api) =
             'Branch '[] '[ '("<capture>", ToApiTree api) ]
 
+    sApiTree = SBranch PNil (Tup SSym (sApiTree @api) :< PNil)
+
 instance (HasApiTree a, HasApiTree b) => HasApiTree (a :<|> b) where
     type ToApiTree (a :<|> b) = MergeTree '[] (ToApiTree a) (ToApiTree b)
+
+    sApiTree = sMergeTree @'[] (sApiTree @a) (sApiTree @b)
 
 class MethodString k where
     type ToMethodString (x :: k) :: Symbol
@@ -240,3 +250,67 @@ reflectSApiTree :: SApiTree api -> ApiTreeMap
 reflectSApiTree (SBranch ms ts) = BranchesMap
     (S.fromAscList (reflectProd reflectSSym ms))
     (M.fromAscList (reflectProd (reflectTup reflectSSym reflectSApiTree) ts))
+
+-- type family Compare (a :: k) (b :: k) :: Ordering
+-- type instance Compare (a :: Symbol) (b :: Symbol) = CmpSymbol a b
+
+data SOrdering :: Ordering -> Type where
+    SLT :: SOrdering 'LT
+    SEQ :: SOrdering 'EQ
+    SGT :: SOrdering 'GT
+
+sCases
+    :: SOrdering c
+    -> f lt
+    -> f eq
+    -> f gt
+    -> f (Cases c lt eq gt)
+sCases = \case
+    SLT -> \lt _ _ -> lt
+    SEQ -> \_ eq _ -> eq
+    SGT -> \_ _ gt -> gt
+
+compSym
+    :: forall a b. ()
+    => SSym a
+    -> SSym b
+    -> SOrdering (CmpSymbol a b)
+compSym a@SSym b@SSym = case compare (symbolVal a) (symbolVal b) of
+    LT -> unsafeCoerce SLT
+    EQ -> unsafeCoerce SEQ
+    GT -> unsafeCoerce SGT
+
+-- sMergeSortedUnique
+--     :: forall err xs ys. ()
+--     => Prod SSym xs
+--     -> Prod SSym ys
+--     -> Prod SSym (MergeSortedUnique err xs ys)
+-- sMergeSortedUnique = \case
+--     PNil -> \case
+--       PNil    -> PNil
+--       y :< ys -> y :< ys
+--     x :< xs -> \case
+--       PNil    -> x :< xs
+--       y :< ys -> sCases (compSym x y)
+--         (x :< sMergeSortedUnique @err xs (y :< ys))
+--         (error "sMergeSortedUnique: forbidden by type system")
+--         (y :< sMergeSortedUnique @err (x :< xs) ys)
+
+sMergePaths
+    :: forall base xs ys. ()
+    => Prod (Tup SSym SApiTree) xs
+    -> Prod (Tup SSym SApiTree) ys
+    -> Prod (Tup SSym SApiTree) (MergePaths base xs ys)
+sMergePaths = \case
+    PNil -> \case
+      PNil -> PNil
+      Tup b y :< bys -> Tup b y :< bys
+    Tup (a :: SSym a) x :< axs -> \case
+      PNil -> Tup a x :< axs
+      Tup b y :< bys -> sCases (compSym a b)
+        (Tup a x :< sMergePaths @base axs (Tup b y :< bys))
+        (Tup a (sMergeTree @(a ': base) x y) :< sMergePaths @base axs bys)
+        (Tup b y :< sMergePaths @base (Tup a x :< axs) bys)
+
+sMergeTree :: forall base a b. SApiTree a -> SApiTree b -> SApiTree (MergeTree base a b)
+sMergeTree (SBranch mA pA) (SBranch mB pB) = SBranch undefined (sMergePaths @base pA pB)
