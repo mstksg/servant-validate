@@ -62,7 +62,7 @@ type family MergePaths (base :: [Symbol]) (xs :: [(Symbol, ApiTree)]) (ys :: [(S
     MergePaths base ( '(a, x) ': axs ) ( '(b, y) ': bys ) = Cases
       (Compare a b)
       ( '(a, x) ': MergePaths base axs ( '(b, y) ': bys ) )
-      ( '(a, MergeTree base x y) ': MergePaths base axs bys )
+      ( '(a, MergeTree (a ': base) x y) ': MergePaths base axs bys )
       ( '(b, y) ': MergePaths base ( '(a, x) ': axs ) bys )
 
 type family MergeTree (base :: [Symbol]) (a :: ApiTree) (b :: ApiTree) :: ApiTree where
@@ -76,17 +76,23 @@ type family MergeTree (base :: [Symbol]) (a :: ApiTree) (b :: ApiTree) :: ApiTre
 
 type family ShowPath (path :: [Symbol]) :: Symbol where
     ShowPath '[] = ""
-    ShowPath (x ': xs) = x `AppendSymbol` "/" `AppendSymbol` ShowPath xs
+    ShowPath '[x] = x
+    ShowPath (x ': y ': xs) = x `AppendSymbol` "/" `AppendSymbol` ShowPath (y ': xs)
 
 
-class HasApiTree (base :: [Symbol]) (api :: Type) where
-    type ToApiTree base api :: ApiTree
+class HasApiTree (api :: Type) where
+    type ToApiTree api :: ApiTree
 
-instance HasApiTree (path ': base) api => HasApiTree base ((path :: Symbol) :> api) where
-    type ToApiTree base (path :> api) = 'Branch '[] '[ '(path, ToApiTree (path ': base) api) ]
+instance HasApiTree api => HasApiTree ((path :: Symbol) :> api) where
+    type ToApiTree (path :> api) = 'Branch '[] '[ '(path, ToApiTree api) ]
 
-instance (HasApiTree base a, HasApiTree base b) => HasApiTree base (a :<|> b) where
-    type ToApiTree base (a :<|> b) = MergeTree base (ToApiTree base a) (ToApiTree base b)
+instance HasApiTree api => HasApiTree (Capture' mods sym a :> api) where
+    type ToApiTree (Capture' mods sym a :> api) =
+            'Branch '[] '[ '("<capture>", ToApiTree api) ]
+
+
+instance (HasApiTree a, HasApiTree b) => HasApiTree (a :<|> b) where
+    type ToApiTree (a :<|> b) = MergeTree '[] (ToApiTree a) (ToApiTree b)
 
 class MethodString k where
     type ToMethodString (x :: k) :: Symbol
@@ -105,30 +111,27 @@ instance MethodString StdMethod where
 instance MethodString Symbol where
     type ToMethodString (m :: Symbol) = m
 
-instance MethodString k => HasApiTree base (Verb (m :: k) s t a) where
-    type ToApiTree base (Verb m s t a) = 'Branch '[ToMethodString m] '[]
+instance MethodString k => HasApiTree (Verb (m :: k) s t a) where
+    type ToApiTree (Verb m s t a) = 'Branch '[ToMethodString m] '[]
 
-instance HasApiTree base api => HasApiTree base (Summary s :> api) where
-    type ToApiTree base (Summary s :> api) = ToApiTree base api
+instance HasApiTree api => HasApiTree (Summary s :> api) where
+    type ToApiTree (Summary s :> api) = ToApiTree api
 
-instance HasApiTree base api => HasApiTree base (Description s :> api) where
-    type ToApiTree base (Description s :> api) = ToApiTree base api
+instance HasApiTree api => HasApiTree (Description s :> api) where
+    type ToApiTree (Description s :> api) = ToApiTree api
 
-instance HasApiTree ("<capture>" ': base) api => HasApiTree base (Capture' mods sym a :> api) where
-    type ToApiTree base (Capture' mods sym a :> api) = ToApiTree ("<capture>" ': base) api
+instance HasApiTree api => HasApiTree (QueryFlag s :> api) where
+    type ToApiTree (QueryFlag s :> api) = ToApiTree api
 
-instance HasApiTree base api => HasApiTree base (QueryFlag s :> api) where
-    type ToApiTree base (QueryFlag s :> api) = ToApiTree base api
+instance HasApiTree api => HasApiTree (QueryParams s a :> api) where
+    type ToApiTree (QueryParams s a :> api) = ToApiTree api
 
-instance HasApiTree base api => HasApiTree base (QueryParams s a :> api) where
-    type ToApiTree base (QueryParams s a :> api) = ToApiTree base api
+instance HasApiTree api => HasApiTree (Header' mods sym a :> api) where
+    type ToApiTree (Header' mods sym a :> api) = ToApiTree api
 
-instance HasApiTree base api => HasApiTree base (Header' mods sym a :> api) where
-    type ToApiTree base (Header' mods sym a :> api) = ToApiTree base api
+type ValidApiTree api = TypeRep (ToApiTree api)
 
-type ValidApiTree api = TypeRep (ToApiTree '[] api)
-
-validApiTree :: forall api. (HasApiTree '[] api, Typeable (ToApiTree '[] api)) => Proxy api -> ValidApiTree api
+validApiTree :: forall api. (HasApiTree api, Typeable (ToApiTree api)) => Proxy api -> ValidApiTree api
 validApiTree _ = typeRep
 
 data ApiTreeMap = BranchesMap (Set Text) (Map Text ApiTreeMap)
@@ -137,11 +140,12 @@ data ApiTreeMap = BranchesMap (Set Text) (Map Text ApiTreeMap)
 reflectApiTree_ :: TypeRep (apiTree :: ApiTree) -> ApiTreeMap
 reflectApiTree_ = reflectSApiTree . toSApiTree
 
-reflectApiTree :: forall api. (HasApiTree '[] api, Typeable (ToApiTree '[] api)) => ApiTreeMap
-reflectApiTree = reflectApiTree_ (typeRep @(ToApiTree '[] api))
+reflectApiTree :: forall api. (HasApiTree api, Typeable (ToApiTree api)) => ApiTreeMap
+reflectApiTree = reflectApiTree_ (typeRep @(ToApiTree api))
 
 type GoodApi = "hello" :> Get '[] ()
           :<|> "ok" :> "bye" :> Get '[] ()
+          :<|> "ok" :> "what" :> Get '[] ()
 
 validGoodApi :: ValidApiTree GoodApi
 validGoodApi = validApiTree (Proxy @GoodApi)
