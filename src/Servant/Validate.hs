@@ -124,50 +124,65 @@ instance MethodString StdMethod where
 instance MethodString Symbol where
     type ToMethodString (m :: Symbol) = m
 
-instance MethodString k => HasApiTree (Verb (m :: k) s t a) where
+instance (MethodString k, KnownSymbol (ToMethodString m)) => HasApiTree (Verb (m :: k) s t a) where
     type ToApiTree (Verb m s t a) = 'Branch '[ToMethodString m] '[]
+    sApiTree = SBranch (SSym :< PNil) PNil
 
 instance HasApiTree api => HasApiTree (Summary s :> api) where
     type ToApiTree (Summary s :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (Description s :> api) where
     type ToApiTree (Description s :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (QueryFlag s :> api) where
     type ToApiTree (QueryFlag s :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (QueryParams s a :> api) where
     type ToApiTree (QueryParams s a :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (QueryParam' mods sym a :> api) where
     type ToApiTree (QueryParam' mods sym a :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (Header' mods sym a :> api) where
     type ToApiTree (Header' mods sym a :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (HttpVersion :> api) where
     type ToApiTree (HttpVersion :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (Vault :> api) where
     type ToApiTree (Vault :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (BasicAuth realm a :> api) where
     type ToApiTree (BasicAuth realm a :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (AuthProtect tag :> api) where
     type ToApiTree (AuthProtect tag :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (IsSecure :> api) where
     type ToApiTree (IsSecure :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (RemoteHost :> api) where
     type ToApiTree (RemoteHost :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (ReqBody' mods ct a :> api) where
     type ToApiTree (ReqBody' mods ct a :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 instance HasApiTree api => HasApiTree (StreamBody' mods framing ct a :> api) where
     type ToApiTree (StreamBody' mods framing ct a :> api) = ToApiTree api
+    sApiTree = sApiTree @api
 
 type ValidApiTree api = TypeRep (ToApiTree api)
 
@@ -259,17 +274,6 @@ data SOrdering :: Ordering -> Type where
     SEQ :: SOrdering 'EQ
     SGT :: SOrdering 'GT
 
-sCases
-    :: SOrdering c
-    -> f lt
-    -> f eq
-    -> f gt
-    -> f (Cases c lt eq gt)
-sCases = \case
-    SLT -> \lt _ _ -> lt
-    SEQ -> \_ eq _ -> eq
-    SGT -> \_ _ gt -> gt
-
 compSym
     :: forall a b. ()
     => SSym a
@@ -280,21 +284,21 @@ compSym a@SSym b@SSym = case compare (symbolVal a) (symbolVal b) of
     EQ -> unsafeCoerce SEQ
     GT -> unsafeCoerce SGT
 
--- sMergeSortedUnique
---     :: forall err xs ys. ()
---     => Prod SSym xs
---     -> Prod SSym ys
---     -> Prod SSym (MergeSortedUnique err xs ys)
--- sMergeSortedUnique = \case
---     PNil -> \case
---       PNil    -> PNil
---       y :< ys -> y :< ys
---     x :< xs -> \case
---       PNil    -> x :< xs
---       y :< ys -> sCases (compSym x y)
---         (x :< sMergeSortedUnique @err xs (y :< ys))
---         (error "sMergeSortedUnique: forbidden by type system")
---         (y :< sMergeSortedUnique @err (x :< xs) ys)
+sMergeSortedUnique
+    :: forall err xs ys. ()
+    => Prod SSym xs
+    -> Prod SSym ys
+    -> Prod SSym (MergeSortedUnique err xs ys)
+sMergeSortedUnique = \case
+    PNil -> \case
+      PNil    -> PNil
+      y :< ys -> y :< ys
+    x :< xs -> \case
+      PNil    -> x :< xs
+      y :< ys -> case compSym x y of
+        SLT -> x :< sMergeSortedUnique @err xs (y :< ys)
+        SEQ -> error "sMergeSortedUnique: forbidden by type system"
+        SGT -> y :< sMergeSortedUnique @err (x :< xs) ys
 
 sMergePaths
     :: forall base xs ys. ()
@@ -307,10 +311,10 @@ sMergePaths = \case
       Tup b y :< bys -> Tup b y :< bys
     Tup (a :: SSym a) x :< axs -> \case
       PNil -> Tup a x :< axs
-      Tup b y :< bys -> sCases (compSym a b)
-        (Tup a x :< sMergePaths @base axs (Tup b y :< bys))
-        (Tup a (sMergeTree @(a ': base) x y) :< sMergePaths @base axs bys)
-        (Tup b y :< sMergePaths @base (Tup a x :< axs) bys)
+      Tup b y :< bys -> case compSym a b of
+        SLT -> Tup a x :< sMergePaths @base axs (Tup b y :< bys)
+        SEQ -> Tup a (sMergeTree @(a ': base) x y) :< sMergePaths @base axs bys
+        SGT -> Tup b y :< sMergePaths @base (Tup a x :< axs) bys
 
 sMergeTree :: forall base a b. SApiTree a -> SApiTree b -> SApiTree (MergeTree base a b)
 sMergeTree (SBranch mA pA) (SBranch mB pB) = SBranch undefined (sMergePaths @base pA pB)
