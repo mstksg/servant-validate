@@ -1,7 +1,10 @@
-
+{-# OPTIONS_GHC -fdefer-type-errors #-}
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators    #-}
+
+import Test.Hspec (hspec, describe, it)
+import Test.ShouldNotTypecheck (shouldNotTypecheck)
 
 import           Data.Proxy
 import           Servant.API
@@ -19,5 +22,10 @@ testApi = Proxy
 validTestApi :: ValidApiTree TestApi
 validTestApi = validApiTree testApi
 
+
+
 main :: IO ()
-main = pure ()
+main = hspec $ do
+  describe "Servant" $ do
+    it "should not allow overlapping routes" $
+      shouldNotTypecheck validTestApi
