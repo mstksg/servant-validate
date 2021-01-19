@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ebfad63ccb01b90eb3b27ce72fe45519b4f2039b00d5cbc3ce2a92e97a72fae7
+-- hash: ef0d21cd2b141bc442164590667f714ed2b7de5975d3dd705fe1912dac9ac424
 
 name:           servant-validate
 version:        0.1.0.0
@@ -40,17 +40,20 @@ library
     , text
   default-language: Haskell2010
 
-executable servant-validate-sample
-  main-is: servant-validate-sample.hs
+test-suite servant-validate-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
   other-modules:
       Paths_servant_validate
   hs-source-dirs:
-      app
+      test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , containers
+    , hspec
     , servant
     , servant-validate
+    , should-not-typecheck
     , text
   default-language: Haskell2010
