@@ -14,8 +14,8 @@
 
 module Servant.Validate.Internal (
     ApiTree(..)
-  , Compare, Cases, MergeSortedUnique, MergePaths, MergeTree
-  , compSym, sMergeSortedUnique, sMergePaths, sMergeTree
+  , Compare, Cases, MergeMethods, MergePaths, MergeTree
+  , compSym, sMergeMethods, sMergePaths, sMergeTree
   , SApiTree(..) , toSApiTree
   , Prod(..), Tup(..), SSym(..)
   , toProd, reflectProd, toTup, reflectTup, toSSym, reflectSSym
@@ -39,15 +39,15 @@ type family Cases (c :: Ordering) (lt :: k) (eq :: k) (gt :: k) where
     Cases 'EQ lt eq gt = eq
     Cases 'GT lt eq gt = gt
 
-type family MergeSortedUnique err (xs :: [k]) (ys :: [k]) :: [k] where
-    MergeSortedUnique err '[]       '[]       = '[]
-    MergeSortedUnique err '[]       (y ': ys) = y ': ys
-    MergeSortedUnique err (x ': xs) '[]       = x ': xs
-    MergeSortedUnique err (x ': xs) (y ': ys) = Cases
+type family MergeMethods err (xs :: [k]) (ys :: [k]) :: [k] where
+    MergeMethods err '[]       '[]       = '[]
+    MergeMethods err '[]       (y ': ys) = y ': ys
+    MergeMethods err (x ': xs) '[]       = x ': xs
+    MergeMethods err (x ': xs) (y ': ys) = Cases
       (Compare x y)
-      (x ': MergeSortedUnique err xs (y ': ys))
+      (x ': MergeMethods err xs (y ': ys))
       (TypeError (err ':<>: 'Text ": " ':<>: ShowType x))
-      (y ': MergeSortedUnique err (x ': xs) ys)
+      (y ': MergeMethods err (x ': xs) ys)
 
 type family MergePaths (base :: [Symbol]) (xs :: [(Symbol, ApiTree)]) (ys :: [(Symbol, ApiTree)]) :: [(Symbol, ApiTree)] where
     MergePaths base '[]                '[]                = '[]
@@ -62,7 +62,7 @@ type family MergePaths (base :: [Symbol]) (xs :: [(Symbol, ApiTree)]) (ys :: [(S
 type family MergeTree (base :: [Symbol]) (a :: ApiTree) (b :: ApiTree) :: ApiTree where
     MergeTree base ('Branch mA pA) ('Branch mB pB) =
         'Branch
-            (MergeSortedUnique
+            (MergeMethods
                 ('Text "Duplicate method in API at path " ':<>: 'Text ("/" `AppendSymbol` ShowPath base))
                 mA mB
             )
@@ -146,21 +146,21 @@ compSym a@SSym b@SSym = case compare (symbolVal a) (symbolVal b) of
     EQ -> unsafeCoerce SEQ
     GT -> unsafeCoerce SGT
 
-sMergeSortedUnique
+sMergeMethods
     :: forall err xs ys. ()
     => Prod SSym xs
     -> Prod SSym ys
-    -> Prod SSym (MergeSortedUnique err xs ys)
-sMergeSortedUnique = \case
+    -> Prod SSym (MergeMethods err xs ys)
+sMergeMethods = \case
     PNil -> \case
       PNil    -> PNil
       y :< ys -> y :< ys
     x :< xs -> \case
       PNil    -> x :< xs
       y :< ys -> case compSym x y of
-        SLT -> x :< sMergeSortedUnique @err xs (y :< ys)
-        SEQ -> error "sMergeSortedUnique: forbidden by type system"
-        SGT -> y :< sMergeSortedUnique @err (x :< xs) ys
+        SLT -> x :< sMergeMethods @err xs (y :< ys)
+        SEQ -> error "sMergeMethods: forbidden by type system"
+        SGT -> y :< sMergeMethods @err (x :< xs) ys
 
 sMergePaths
     :: forall base xs ys. ()
