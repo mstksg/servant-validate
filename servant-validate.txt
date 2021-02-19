@@ -2,11 +2,35 @@
 -- See Hoogle, http://www.haskell.org/hoogle/
 
 
--- | Please see the README on GitHub at
---   <a>https://github.com/githubuser/servant-validate#readme</a>
+-- | Chekc static properties of servant APIs
+--   
+--   A package with "test suites" to help verify that your servant APIs are
+--   valid at compile-time.
+--   
+--   Currently the only property tested is that there are no duplicated
+--   paths.
+--   
+--   ```haskell data DeadlySinEnum = Lust | Gluttony | Greed | Sloth |
+--   Wrath | Envy | Pride
+--   
+--   type MathApi = "sin" :&gt; ReqBody '[JSON] Double :&gt; Post '[JSON]
+--   NoContent type SatanApi = "sin" :&gt; ReqBody '[JSON] DeadlySinEnum
+--   :&gt; Post '[JSON] NoContent
+--   
+--   type MyApi = MathApi :<a>|</a> SatanApi
+--   
+--   myApi :: Proxy MyApi myApi = Proxy
+--   
+--   validMyApi :: ValidApiTree MyApi validMyApi = validApiTree myApi ```
+--   
+--   ```haskell warning: [-Wdeferred-type-errors] • Duplicate method in API
+--   at path /sin: <a>POST</a> • In the expression: validApiTree myApi In
+--   an equation for ‘validMyApi’: validMyApi = validApiTree myApi ```
 @package servant-validate
 @version 0.1.0.0
 
+
+-- | Internal type-level tools.
 module Servant.Validate.Internal
 data ApiTree
 Branch :: [Symbol] -> [(Symbol, ApiTree)] -> ApiTree
@@ -41,6 +65,11 @@ instance forall a b (f :: a -> *) (g :: b -> *) (xy :: (a, b)). (forall (a1 :: a
 instance GHC.Show.Show (Servant.Validate.Internal.SSym s)
 instance GHC.Show.Show (Servant.Validate.Internal.SApiTree api)
 
+
+-- | A package with "test suites" to help verify that your servant APIs are
+--   valid at compile-time. Currently the only property tested is that
+--   there are no duplicated paths. See README for more information on
+--   usage.
 module Servant.Validate
 
 -- | Has a valid well-formed API Tree
@@ -52,6 +81,8 @@ class HasApiTree (api :: Type) where {
 --   <a>reflectApiTree</a>. This is not used in any part of the actual
 --   validation; is just an extra treat.
 sApiTree :: HasApiTree api => SApiTree (ToApiTree api)
+
+-- | A type-level version of <a>ReflectMethod</a>.
 class MethodString k where {
     type family ToMethodString (x :: k) :: Symbol;
 }
