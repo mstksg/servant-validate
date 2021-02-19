@@ -12,6 +12,17 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
+-- |
+-- Module      : Servant.Validate.Internal
+-- Copyright   : (c) Justin Le 2021
+-- License     : BSD3
+--
+-- Maintainer  : justin@jle.im
+-- Stability   : experimental
+-- Portability : non-portable
+--
+-- Internal type-level tools.
+
 module Servant.Validate.Internal (
     ApiTree(..)
   , Compare, Cases, MergeMethods, MergePaths, MergeTree

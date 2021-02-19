@@ -18,6 +18,19 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
 
+-- |
+-- Module      : Servant.Validate
+-- Copyright   : (c) Justin Le 2021
+-- License     : BSD3
+--
+-- Maintainer  : justin@jle.im
+-- Stability   : experimental
+-- Portability : non-portable
+--
+-- A package with "test suites" to help verify that your servant APIs are
+-- valid at compile-time.  Currently the only property tested is that there
+-- are no duplicated paths.  See README for more information on usage.
+
 module Servant.Validate
   ( HasApiTree(..), MethodString(..)
   , validApiTree, ValidApiTree
@@ -72,6 +85,7 @@ instance (HasApiTree a, HasApiTree b) => HasApiTree (a :<|> b) where
 
     sApiTree = sMergeTree @'[] (sApiTree @a) (sApiTree @b)
 
+-- | A type-level version of 'Servant.API.Verbs.ReflectMethod'.
 class MethodString k where
     type ToMethodString (x :: k) :: Symbol
 

@@ -1,5 +1,10 @@
 # servant-validate
 
+A package with "test suites" to help verify that your servant APIs are valid at
+compile-time.
+
+Currently the only property tested is that there are no duplicated paths.
+
 ```haskell
 data DeadlySinEnum = Lust | Gluttony | Greed | Sloth | Wrath | Envy | Pride
 
