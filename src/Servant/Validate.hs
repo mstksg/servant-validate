@@ -107,6 +107,10 @@ instance (MethodString k, KnownSymbol (ToMethodString m)) => HasApiTree (Verb (m
     type ToApiTree (Verb m s t a) = 'Branch '[ToMethodString m] '[]
     sApiTree = SBranch (SSym :< PNil) PNil
 
+instance (MethodString k, KnownSymbol (ToMethodString m)) => HasApiTree (NoContentVerb (m :: k)) where
+    type ToApiTree (NoContentVerb m) = 'Branch '[ToMethodString m] '[]
+    sApiTree = SBranch (SSym :< PNil) PNil
+
 instance HasApiTree api => HasApiTree (Summary s :> api) where
     type ToApiTree (Summary s :> api) = ToApiTree api
     sApiTree = sApiTree @api
